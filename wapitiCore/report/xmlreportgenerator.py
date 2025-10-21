@@ -63,119 +63,147 @@ class XMLReportGenerator(JSONReportGenerator):
         self._additionals = {}
 
     # pylint: disable=too-many-locals
-    def generate_report(self, output_path):
-        """
-        Create a xml file with a report of the vulnerabilities which have been logged with
-        the method add_vulnerability(vulnerabilityTypeName,level,url,parameter,info)
-        """
+# pylint: disable=too-many-locals
+def generate_report(self, output_path):
+    """
+    Create an XML file with a report of the vulnerabilities which have been logged with
+    the method add_vulnerability(vulnerabilityTypeName, level, url, parameter, info)
+    """
 
-        report = self._xml_doc.createElement("report")
-        report.setAttribute("type", "security")
-        self._xml_doc.appendChild(report)
+    def safe_text(value):
+        """Ensure the value is a string (never None or non-string type)."""
+        if value is None:
+            return ""
+        return str(value)
 
-        # Add report infos
-        report_infos = self._create_info_section()
-        report.appendChild(report_infos)
+    report = self._xml_doc.createElement("report")
+    report.setAttribute("type", "security")
+    self._xml_doc.appendChild(report)
 
-        vulnerabilities = self._xml_doc.createElement("vulnerabilities")
-        anomalies = self._xml_doc.createElement("anomalies")
-        additionals = self._xml_doc.createElement("additionals")
+    # Add report infos
+    report_infos = self._create_info_section()
+    report.appendChild(report_infos)
 
-        # Loop on each flaw classification
-        for flaw_type_name, flaw_type in self._flaw_types.items():
-            container = None
-            classification = ""
-            flaw_dict = {}
-            if flaw_type_name in self._vulns:
-                container = vulnerabilities
-                classification = "vulnerability"
-                flaw_dict = self._vulns
-            elif flaw_type_name in self._anomalies:
-                container = anomalies
-                classification = "anomaly"
-                flaw_dict = self._anomalies
-            elif flaw_type_name in self._additionals:
-                container = additionals
-                classification = "additional"
-                flaw_dict = self._additionals
+    vulnerabilities = self._xml_doc.createElement("vulnerabilities")
+    anomalies = self._xml_doc.createElement("anomalies")
+    additionals = self._xml_doc.createElement("additionals")
 
-            # Child nodes with a description of the flaw type
-            flaw_type_node = self._xml_doc.createElement(classification)
-            flaw_type_node.setAttribute("name", flaw_type_name)
-            flaw_type_desc = self._xml_doc.createElement("description")
-            flaw_type_desc.appendChild(self._xml_doc.createCDATASection(flaw_type["desc"]))
-            flaw_type_node.appendChild(flaw_type_desc)
-            flaw_type_solution = self._xml_doc.createElement("solution")
-            flaw_type_solution.appendChild(self._xml_doc.createCDATASection(flaw_type["sol"]))
-            flaw_type_node.appendChild(flaw_type_solution)
+    # Loop on each flaw classification
+    for flaw_type_name, flaw_type in self._flaw_types.items():
+        container = None
+        classification = ""
+        flaw_dict = {}
+        if flaw_type_name in self._vulns:
+            container = vulnerabilities
+            classification = "vulnerability"
+            flaw_dict = self._vulns
+        elif flaw_type_name in self._anomalies:
+            container = anomalies
+            classification = "anomaly"
+            flaw_dict = self._anomalies
+        elif flaw_type_name in self._additionals:
+            container = additionals
+            classification = "additional"
+            flaw_dict = self._additionals
 
-            flaw_type_references = self._xml_doc.createElement("references")
-            for ref in flaw_type["ref"]:
-                reference_node = self._xml_doc.createElement("reference")
-                title_node = self._xml_doc.createElement("title")
-                url_node = self._xml_doc.createElement("url")
-                title_node.appendChild(self._xml_doc.createTextNode(ref))
-                url = flaw_type["ref"][ref]
-                url_node.appendChild(self._xml_doc.createTextNode(url))
-                wstg_node = self._xml_doc.createElement("wstg")
-                for wstg_code in flaw_type["wstg"] or []:
-                    wstg_code_node = self._xml_doc.createElement("code")
-                    wstg_code_node.appendChild(self._xml_doc.createTextNode(wstg_code))
-                    wstg_node.appendChild(wstg_code_node)
-                reference_node.appendChild(title_node)
-                reference_node.appendChild(url_node)
-                reference_node.appendChild(wstg_node)
-                flaw_type_references.appendChild(reference_node)
-            flaw_type_node.appendChild(flaw_type_references)
+        # Child nodes with a description of the flaw type
+        flaw_type_node = self._xml_doc.createElement(classification)
+        flaw_type_node.setAttribute("name", flaw_type_name)
 
-            # And child nodes with each flaw of the current type
-            entries_node = self._xml_doc.createElement("entries")
-            for flaw in flaw_dict[flaw_type_name]:
-                entry_node = self._xml_doc.createElement("entry")
-                method_node = self._xml_doc.createElement("method")
-                method_node.appendChild(self._xml_doc.createTextNode(flaw["method"]))
-                entry_node.appendChild(method_node)
-                path_node = self._xml_doc.createElement("path")
-                path_node.appendChild(self._xml_doc.createTextNode(flaw["path"]))
-                entry_node.appendChild(path_node)
-                level_node = self._xml_doc.createElement("level")
-                level_node.appendChild(self._xml_doc.createTextNode(str(flaw["level"])))
-                entry_node.appendChild(level_node)
-                parameter_node = self._xml_doc.createElement("parameter")
-                parameter_node.appendChild(self._xml_doc.createTextNode(flaw["parameter"]))
-                entry_node.appendChild(parameter_node)
-                info_node = self._xml_doc.createElement("info")
-                info_node.appendChild(self._xml_doc.createTextNode(flaw["info"]))
-                entry_node.appendChild(info_node)
-                referer_node = self._xml_doc.createElement("referer")
-                referer_node.appendChild(self._xml_doc.createTextNode(flaw["referer"]))
-                entry_node.appendChild(referer_node)
-                module_node = self._xml_doc.createElement("module")
-                module_node.appendChild(self._xml_doc.createTextNode(flaw["module"]))
-                entry_node.appendChild(module_node)
-                http_request_node = self._xml_doc.createElement("http_request")
-                http_request_node.appendChild(self._xml_doc.createCDATASection(flaw["http_request"]))
-                entry_node.appendChild(http_request_node)
-                curl_command_node = self._xml_doc.createElement("curl_command")
-                curl_command_node.appendChild(self._xml_doc.createCDATASection(flaw["curl_command"]))
-                entry_node.appendChild(curl_command_node)
-                wstg_node = self._xml_doc.createElement("wstg")
-                for wstg_code in flaw["wstg"] or []:
-                    wstg_code_node = self._xml_doc.createElement("code")
-                    wstg_code_node.appendChild(self._xml_doc.createTextNode(wstg_code))
-                    wstg_node.appendChild(wstg_code_node)
-                entry_node.appendChild(wstg_node)
-                if self._infos["detailed_report_level"]:
-                    entry_node.appendChild(self._create_detail_section(flaw))
-                entries_node.appendChild(entry_node)
-            flaw_type_node.appendChild(entries_node)
-            container.appendChild(flaw_type_node)
-        report.appendChild(vulnerabilities)
-        report.appendChild(anomalies)
-        report.appendChild(additionals)
+        flaw_type_desc = self._xml_doc.createElement("description")
+        flaw_type_desc.appendChild(self._xml_doc.createCDATASection(safe_text(flaw_type["desc"])))
+        flaw_type_node.appendChild(flaw_type_desc)
 
-        with open(output_path, "w", errors="ignore", encoding='utf-8') as xml_report_file:
-            self._xml_doc.writexml(xml_report_file, addindent="   ", newl="\n")
+        flaw_type_solution = self._xml_doc.createElement("solution")
+        flaw_type_solution.appendChild(self._xml_doc.createCDATASection(safe_text(flaw_type["sol"])))
+        flaw_type_node.appendChild(flaw_type_solution)
+
+        flaw_type_references = self._xml_doc.createElement("references")
+        for ref in flaw_type["ref"]:
+            reference_node = self._xml_doc.createElement("reference")
+            title_node = self._xml_doc.createElement("title")
+            url_node = self._xml_doc.createElement("url")
+
+            title_node.appendChild(self._xml_doc.createTextNode(safe_text(ref)))
+            url = flaw_type["ref"][ref]
+            url_node.appendChild(self._xml_doc.createTextNode(safe_text(url)))
+
+            wstg_node = self._xml_doc.createElement("wstg")
+            for wstg_code in flaw_type.get("wstg") or []:
+                wstg_code_node = self._xml_doc.createElement("code")
+                wstg_code_node.appendChild(self._xml_doc.createTextNode(safe_text(wstg_code)))
+                wstg_node.appendChild(wstg_code_node)
+
+            reference_node.appendChild(title_node)
+            reference_node.appendChild(url_node)
+            reference_node.appendChild(wstg_node)
+            flaw_type_references.appendChild(reference_node)
+
+        flaw_type_node.appendChild(flaw_type_references)
+
+        # And child nodes with each flaw of the current type
+        entries_node = self._xml_doc.createElement("entries")
+        for flaw in flaw_dict[flaw_type_name]:
+            entry_node = self._xml_doc.createElement("entry")
+
+            method_node = self._xml_doc.createElement("method")
+            method_node.appendChild(self._xml_doc.createTextNode(safe_text(flaw.get("method"))))
+            entry_node.appendChild(method_node)
+
+            path_node = self._xml_doc.createElement("path")
+            path_node.appendChild(self._xml_doc.createTextNode(safe_text(flaw.get("path"))))
+            entry_node.appendChild(path_node)
+
+            level_node = self._xml_doc.createElement("level")
+            level_node.appendChild(self._xml_doc.createTextNode(safe_text(flaw.get("level"))))
+            entry_node.appendChild(level_node)
+
+            parameter_node = self._xml_doc.createElement("parameter")
+            parameter_node.appendChild(self._xml_doc.createTextNode(safe_text(flaw.get("parameter"))))
+            entry_node.appendChild(parameter_node)
+
+            info_node = self._xml_doc.createElement("info")
+            info_node.appendChild(self._xml_doc.createTextNode(safe_text(flaw.get("info"))))
+            entry_node.appendChild(info_node)
+
+            referer_node = self._xml_doc.createElement("referer")
+            referer_node.appendChild(self._xml_doc.createTextNode(safe_text(flaw.get("referer"))))
+            entry_node.appendChild(referer_node)
+
+            module_node = self._xml_doc.createElement("module")
+            module_node.appendChild(self._xml_doc.createTextNode(safe_text(flaw.get("module"))))
+            entry_node.appendChild(module_node)
+
+            http_request_node = self._xml_doc.createElement("http_request")
+            http_request_node.appendChild(self._xml_doc.createCDATASection(safe_text(flaw.get("http_request"))))
+            entry_node.appendChild(http_request_node)
+
+            curl_command_node = self._xml_doc.createElement("curl_command")
+            curl_command_node.appendChild(self._xml_doc.createCDATASection(safe_text(flaw.get("curl_command"))))
+            entry_node.appendChild(curl_command_node)
+
+            wstg_node = self._xml_doc.createElement("wstg")
+            for wstg_code in flaw.get("wstg") or []:
+                wstg_code_node = self._xml_doc.createElement("code")
+                wstg_code_node.appendChild(self._xml_doc.createTextNode(safe_text(wstg_code)))
+                wstg_node.appendChild(wstg_code_node)
+            entry_node.appendChild(wstg_node)
+
+            if self._infos.get("detailed_report_level"):
+                entry_node.appendChild(self._create_detail_section(flaw))
+
+            entries_node.appendChild(entry_node)
+
+        flaw_type_node.appendChild(entries_node)
+        container.appendChild(flaw_type_node)
+
+    report.appendChild(vulnerabilities)
+    report.appendChild(anomalies)
+    report.appendChild(additionals)
+
+    with open(output_path, "w", errors="ignore", encoding="utf-8") as xml_report_file:
+        self._xml_doc.writexml(xml_report_file, addindent="   ", newl="\n")
+
 
     def _create_detail_section(self, flaw: dict) -> Element:
         """
